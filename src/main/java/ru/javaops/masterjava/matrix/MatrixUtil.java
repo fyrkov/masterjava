@@ -15,7 +15,7 @@ import java.util.concurrent.Future;
  */
 public class MatrixUtil {
 
-    // TODO implement parallel multiplication matrixA*matrixB
+    //method with N=matrixSize^3 threads
     public static int[][] concurrentMultiply(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
@@ -42,7 +42,7 @@ public class MatrixUtil {
         return matrixC;
     }
 
-    // TODO implement parallel multiplication matrixA*matrixB
+    //method with N=matrixSize^2 threads
     public static int[][] concurrentMultiply2(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
@@ -65,16 +65,18 @@ public class MatrixUtil {
         return matrixC;
     }
 
+    //method with N=matrixSize threads
     public static int[][] concurrentMultiply3(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
+
         for (int i = 0; i < matrixSize; i++) {
 
             int finalI = i;
-            Future<Integer[]> future = executor.submit(new Callable<Integer[]>() {
+            Future<int[]> future = executor.submit(new Callable<int[]>() {
                 @Override
-                public Integer[] call() throws Exception {
-                    Integer sum[] = new Integer[matrixSize];
+                public int[] call() throws Exception {
+                    int sum[] = new int[matrixSize];
                     for (int j = 0; j < matrixSize; j++) {
                         sum[j] = 0;
                         for (int k = 0; k < matrixSize; k++) {
@@ -84,15 +86,12 @@ public class MatrixUtil {
                     return sum;
                 }
             });
-
-            Integer arr[] = future.get();
-            for (int j = 0; j < matrixSize; j++) {
-                matrixC[i][j] = arr[j];
-            }
+            matrixC[i] = future.get();
         }
         return matrixC;
     }
 
+    //method with 1 thread?
     public static int[][] concurrentMultiply4(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
 
@@ -115,6 +114,79 @@ public class MatrixUtil {
         return future.get();
     }
 
+    //method with 2 threads
+    public static int[][] concurrentMultiply5(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
+        final int matrixSize = matrixA.length;
+        final int[][] matrixC = new int[matrixSize][matrixSize];
+
+        Future<int[][]> future1 = executor.submit(() -> {
+            final int[][] arr = new int[matrixSize / 2][matrixSize];
+            for (int i = 0; i < matrixSize / 2; i++) {
+                for (int j = 0; j < matrixSize; j++) {
+                    int sum = 0;
+                    for (int k = 0; k < matrixSize; k++) {
+                        sum += matrixA[i][k] * matrixB[k][j];
+                    }
+                    arr[i][j] = sum;
+                }
+            }
+            return arr;
+        });
+
+        Future<int[][]> future2 = executor.submit(() -> {
+            final int[][] arr = new int[matrixSize / 2][matrixSize];
+            for (int i = matrixSize / 2; i < matrixSize; i++) {
+                for (int j = 0; j < matrixSize; j++) {
+                    int sum = 0;
+                    for (int k = 0; k < matrixSize; k++) {
+                        sum += matrixA[i][k] * matrixB[k][j];
+                    }
+                    arr[i - matrixSize / 2][j] = sum;
+                }
+            }
+            return arr;
+        });
+
+        for (int i = 0; i < matrixSize / 2; i++) {
+            System.arraycopy(future1.get()[i], 0, matrixC[i], 0, matrixSize);
+            System.arraycopy(future2.get()[i], 0, matrixC[matrixSize / 2 + i], 0, matrixSize);
+        }
+
+        return matrixC;
+    }
+
+    //method with custom thread quantity
+    public static int[][] concurrentMultiply6(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
+        final int matrixSize = matrixA.length;
+        final int[][] matrixC = new int[matrixSize][matrixSize];
+
+        int TM = 2; //threads quantity
+        Future<int[][]> future[] = new Future[TM];
+        for (int t = 0; t < TM; t++) {
+            int finalT = t;
+            future[t] = executor.submit(() -> {
+                final int[][] arr = new int[matrixSize / TM][matrixSize];
+                for (int i = matrixSize / TM * finalT; i < matrixSize / TM * (finalT + 1); i++) {
+                    for (int j = 0; j < matrixSize; j++) {
+                        int sum = 0;
+                        for (int k = 0; k < matrixSize; k++) {
+                            sum += matrixA[i][k] * matrixB[k][j];
+                        }
+                        arr [i - matrixSize / TM * finalT][j] = sum;
+                    }
+                }
+                return arr;
+            });
+        }
+
+        for (int t = 0; t < TM; t++) {
+            for (int i = 0; i < matrixSize / TM; i++) {
+                System.arraycopy(future[t].get()[i], 0, matrixC[matrixSize / TM * t + i], 0, matrixSize);
+            }
+        }
+
+        return matrixC;
+    }
 
     // TODO optimize by https://habrahabr.ru/post/114797/
     public static int[][] singleThreadMultiply(int[][] matrixA, int[][] matrixB) {

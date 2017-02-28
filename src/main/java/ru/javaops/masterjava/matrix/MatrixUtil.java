@@ -160,7 +160,7 @@ public class MatrixUtil {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
 
-        int TM = 2; //threads quantity
+        int TM = 10; //threads quantity
         Future<int[][]> future[] = new Future[TM];
         for (int t = 0; t < TM; t++) {
             int finalT = t;
